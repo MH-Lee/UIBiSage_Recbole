@@ -1,0 +1,1 @@
+from recbole.model.general_recommender.bpr import BPR
