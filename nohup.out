@@ -1,220 +1,0 @@
-command line args [--model_name UIBiSage --data_name ml-1m] will not be used in RecBole
-11 Apr 15:14    INFO  
-General Hyper Parameters:
-gpu_id = 1
-use_gpu = True
-seed = 2020
-state = INFO
-reproducibility = True
-data_path = ./dataset/ml-1m
-checkpoint_dir = ./saved/ml-1m/
-show_progress = False
-save_dataset = True
-dataset_save_path = None
-save_dataloaders = False
-dataloaders_save_path = None
-log_wandb = True
-
-Training Hyper Parameters:
-epochs = 50
-train_batch_size = 256
-learner = adam
-learning_rate = 0.001
-neg_sampling = {'uniform': 1}
-eval_step = 5
-stopping_step = 5
-clip_grad_norm = None
-weight_decay = 0.0
-loss_decimal_place = 4
-
-Evaluation Hyper Parameters:
-eval_args = {'group_by': 'user', 'mode': 'uni100', 'order': 'TO', 'split': {'LS': 'valid_and_test'}}
-repeatable = True
-metrics = ['MRR', 'NDCG', 'Hit']
-topk = [1, 5, 10]
-valid_metric = MRR@10
-valid_metric_bigger = True
-eval_batch_size = 6464
-metric_decimal_place = 4
-
-Dataset Hyper Parameters:
-field_separator = 	
-seq_separator =  
-USER_ID_FIELD = user_id
-ITEM_ID_FIELD = item_id
-RATING_FIELD = rating
-TIME_FIELD = timestamp
-seq_len = None
-LABEL_FIELD = label
-threshold = None
-NEG_PREFIX = neg_
-load_col = {'inter': ['user_id', 'item_id', 'timestamp']}
-unload_col = None
-unused_col = None
-additional_feat_suffix = None
-rm_dup_inter = None
-val_interval = None
-filter_inter_by_user_or_item = True
-user_inter_num_interval = [5,inf)
-item_inter_num_interval = [5,inf)
-alias_of_user_id = None
-alias_of_item_id = None
-alias_of_entity_id = None
-alias_of_relation_id = None
-preload_weight = None
-normalize_field = None
-normalize_all = None
-ITEM_LIST_LENGTH_FIELD = item_length
-LIST_SUFFIX = _list
-MAX_ITEM_LIST_LENGTH = 200
-POSITION_FIELD = position_id
-HEAD_ENTITY_ID_FIELD = head_id
-TAIL_ENTITY_ID_FIELD = tail_id
-RELATION_ID_FIELD = relation_id
-ENTITY_ID_FIELD = entity_id
-benchmark_filename = None
-
-Other Hyper Parameters: 
-wandb_project = recbole-wandb
-require_pow = False
-n_layers = 2
-n_heads = 2
-n_way = 1
-user_embedding_size = 256
-item_embedding_size = 256
-hidden_size = 64
-inner_size = 256
-hidden_dropout_prob = 0.5
-attn_dropout_prob = 0.5
-hidden_act = gelu
-layer_norm_eps = 1e-12
-initializer_range = 0.02
-loss_type = BPR
-seq_aggregate = True
-u_cutoff = 0.6
-i_cutoff = 0.6
-MODEL_TYPE = ModelType.SEQUENTIAL
-train_neg_sample_args = {'strategy': 'by', 'by': 1, 'distribution': 'uniform', 'dynamic': 'none'}
-eval_neg_sample_args = {'strategy': 'by', 'by': 100, 'distribution': 'uniform'}
-n_blocks = 2
-s_attn_first = True
-MODEL_INPUT_TYPE = InputType.PAIRWISE
-eval_type = EvaluatorType.RANKING
-device = cuda
-
-
-Recbole Start!
-{'data_name': 'ml-1m', 'model_name': 'UIBiSage'}
-True
-11 Apr 15:14    INFO  load data
-11 Apr 15:14    INFO  Load split dataloaders from: [./saved/ml-1m/ml-1m-for-UIBiSage-dataloader.pth]
-  0%|          | 0/6040 [00:00<?, ?it/s]  1%|          | 53/6040 [00:00<00:11, 523.65it/s]  2%|▏         | 108/6040 [00:00<00:11, 536.72it/s]  3%|▎         | 163/6040 [00:00<00:10, 541.48it/s]  4%|▎         | 218/6040 [00:00<00:10, 543.94it/s]  5%|▍         | 273/6040 [00:00<00:10, 544.95it/s]  5%|▌         | 328/6040 [00:00<00:10, 546.04it/s]  6%|▋         | 383/6040 [00:00<00:10, 546.72it/s]  7%|▋         | 438/6040 [00:00<00:10, 547.05it/s]  8%|▊         | 493/6040 [00:00<00:10, 546.99it/s]  9%|▉         | 548/6040 [00:01<00:10, 546.15it/s] 10%|▉         | 603/6040 [00:01<00:09, 546.30it/s] 11%|█         | 658/6040 [00:01<00:09, 546.51it/s] 12%|█▏        | 713/6040 [00:01<00:09, 546.58it/s] 13%|█▎        | 768/6040 [00:01<00:09, 546.63it/s] 14%|█▎        | 823/6040 [00:01<00:09, 532.82it/s] 15%|█▍        | 877/6040 [00:01<00:09, 534.21it/s] 15%|█▌        | 931/6040 [00:01<00:09, 535.31it/s] 16%|█▋        | 985/6040 [00:01<00:09, 535.98it/s] 17%|█▋        | 1039/6040 [00:01<00:09, 536.23it/s] 18%|█▊        | 1093/6040 [00:02<00:09, 535.80it/s] 19%|█▉        | 1147/6040 [00:02<00:09, 535.83it/s] 20%|█▉        | 1201/6040 [00:02<00:09, 536.22it/s] 21%|██        | 1255/6040 [00:02<00:08, 536.56it/s] 22%|██▏       | 1309/6040 [00:02<00:08, 536.68it/s] 23%|██▎       | 1363/6040 [00:02<00:08, 536.32it/s] 23%|██▎       | 1417/6040 [00:02<00:08, 536.70it/s] 24%|██▍       | 1471/6040 [00:02<00:08, 536.82it/s] 25%|██▌       | 1525/6040 [00:02<00:08, 536.95it/s] 26%|██▌       | 1579/6040 [00:02<00:08, 537.13it/s] 27%|██▋       | 1633/6040 [00:03<00:08, 535.62it/s] 28%|██▊       | 1687/6040 [00:03<00:08, 536.65it/s] 29%|██▉       | 1741/6040 [00:03<00:08, 536.35it/s] 30%|██▉       | 1795/6040 [00:03<00:07, 537.16it/s] 31%|███       | 1850/6040 [00:03<00:07, 538.49it/s] 32%|███▏      | 1905/6040 [00:03<00:07, 541.71it/s] 32%|███▏      | 1960/6040 [00:03<00:07, 543.91it/s] 33%|███▎      | 2015/6040 [00:03<00:07, 543.88it/s] 34%|███▍      | 2070/6040 [00:03<00:07, 541.88it/s] 35%|███▌      | 2125/6040 [00:03<00:07, 541.47it/s] 36%|███▌      | 2180/6040 [00:04<00:07, 540.91it/s] 37%|███▋      | 2236/6040 [00:04<00:06, 543.72it/s] 38%|███▊      | 2291/6040 [00:04<00:06, 545.24it/s] 39%|███▉      | 2346/6040 [00:04<00:06, 546.36it/s] 40%|███▉      | 2401/6040 [00:04<00:06, 544.74it/s] 41%|████      | 2456/6040 [00:04<00:06, 543.55it/s] 42%|████▏     | 2511/6040 [00:04<00:06, 542.28it/s] 42%|████▏     | 2566/6040 [00:04<00:06, 541.61it/s] 43%|████▎     | 2621/6040 [00:04<00:06, 530.67it/s] 44%|████▍     | 2676/6040 [00:04<00:06, 534.79it/s] 45%|████▌     | 2730/6040 [00:05<00:06, 534.67it/s] 46%|████▌     | 2786/6040 [00:05<00:06, 539.72it/s] 47%|████▋     | 2842/6040 [00:05<00:05, 543.63it/s] 48%|████▊     | 2898/6040 [00:05<00:05, 545.87it/s] 49%|████▉     | 2953/6040 [00:05<00:05, 540.24it/s] 50%|████▉     | 3008/6040 [00:05<00:05, 527.11it/s] 51%|█████     | 3063/6040 [00:05<00:05, 532.85it/s] 52%|█████▏    | 3118/6040 [00:05<00:05, 537.39it/s] 53%|█████▎    | 3173/6040 [00:05<00:05, 541.07it/s] 53%|█████▎    | 3228/6040 [00:05<00:05, 543.51it/s] 54%|█████▍    | 3283/6040 [00:06<00:05, 545.14it/s] 55%|█████▌    | 3338/6040 [00:06<00:05, 537.65it/s] 56%|█████▌    | 3393/6040 [00:06<00:04, 539.84it/s] 57%|█████▋    | 3448/6040 [00:06<00:04, 542.37it/s] 58%|█████▊    | 3503/6040 [00:06<00:04, 544.37it/s] 59%|█████▉    | 3558/6040 [00:06<00:04, 545.86it/s] 60%|█████▉    | 3613/6040 [00:06<00:04, 546.75it/s] 61%|██████    | 3668/6040 [00:06<00:04, 547.27it/s] 62%|██████▏   | 3723/6040 [00:06<00:04, 547.46it/s] 63%|██████▎   | 3778/6040 [00:06<00:04, 547.44it/s] 63%|██████▎   | 3833/6040 [00:07<00:04, 547.60it/s] 64%|██████▍   | 3888/6040 [00:07<00:03, 547.65it/s] 65%|██████▌   | 3943/6040 [00:07<00:03, 547.78it/s] 66%|██████▌   | 3998/6040 [00:07<00:03, 547.80it/s] 67%|██████▋   | 4053/6040 [00:07<00:03, 548.12it/s] 68%|██████▊   | 4108/6040 [00:07<00:03, 548.28it/s] 69%|██████▉   | 4163/6040 [00:07<00:03, 548.42it/s] 70%|██████▉   | 4218/6040 [00:07<00:03, 548.69it/s] 71%|███████   | 4273/6040 [00:07<00:03, 549.05it/s] 72%|███████▏  | 4328/6040 [00:07<00:03, 549.19it/s] 73%|███████▎  | 4383/6040 [00:08<00:03, 549.11it/s] 73%|███████▎  | 4438/6040 [00:08<00:02, 549.22it/s] 74%|███████▍  | 4493/6040 [00:08<00:02, 549.23it/s] 75%|███████▌  | 4548/6040 [00:08<00:02, 549.30it/s] 76%|███████▌  | 4603/6040 [00:08<00:02, 549.43it/s] 77%|███████▋  | 4658/6040 [00:08<00:02, 549.49it/s] 78%|███████▊  | 4713/6040 [00:08<00:02, 549.60it/s] 79%|███████▉  | 4768/6040 [00:08<00:02, 549.65it/s] 80%|███████▉  | 4823/6040 [00:08<00:02, 549.46it/s] 81%|████████  | 4878/6040 [00:08<00:02, 549.53it/s] 82%|████████▏ | 4933/6040 [00:09<00:02, 549.47it/s] 83%|████████▎ | 4988/6040 [00:09<00:01, 542.07it/s] 83%|████████▎ | 5043/6040 [00:09<00:01, 544.01it/s] 84%|████████▍ | 5098/6040 [00:09<00:01, 545.11it/s] 85%|████████▌ | 5153/6040 [00:09<00:01, 529.35it/s] 86%|████████▌ | 5209/6040 [00:09<00:01, 536.21it/s] 87%|████████▋ | 5265/6040 [00:09<00:01, 541.08it/s] 88%|████████▊ | 5320/6040 [00:09<00:01, 543.40it/s] 89%|████████▉ | 5376/6040 [00:09<00:01, 546.08it/s] 90%|████████▉ | 5432/6040 [00:10<00:01, 548.02it/s] 91%|█████████ | 5488/6040 [00:10<00:01, 549.39it/s] 92%|█████████▏| 5544/6040 [00:10<00:00, 550.41it/s] 93%|█████████▎| 5600/6040 [00:10<00:00, 550.98it/s] 94%|█████████▎| 5656/6040 [00:10<00:00, 550.50it/s] 95%|█████████▍| 5712/6040 [00:10<00:00, 549.95it/s] 95%|█████████▌| 5768/6040 [00:10<00:00, 549.20it/s] 96%|█████████▋| 5823/6040 [00:10<00:00, 548.99it/s] 97%|█████████▋| 5878/6040 [00:10<00:00, 548.59it/s] 98%|█████████▊| 5933/6040 [00:10<00:00, 548.10it/s] 99%|█████████▉| 5988/6040 [00:11<00:00, 547.80it/s]100%|██████████| 6040/6040 [00:11<00:00, 543.14it/s]
-/root/anaconda3/envs/uibi/lib/python3.8/site-packages/dgl/heterograph.py:72: DGLWarning: Recommend creating graphs by `dgl.graph(data)` instead of `dgl.DGLGraph(data)`.
-  dgl_warning('Recommend creating graphs by `dgl.graph(data)`'
-11 Apr 15:15    INFO  UIBiSage(
-  (I2U_SAGE): ModuleList(
-    (0): SAGEConv(
-      (feat_drop): Dropout(p=0.0, inplace=False)
-      (fc_self): Linear(in_features=256, out_features=64, bias=False)
-      (fc_neigh): Linear(in_features=256, out_features=64, bias=False)
-    )
-  )
-  (U2I_SAGE): ModuleList(
-    (0): SAGEConv(
-      (feat_drop): Dropout(p=0.0, inplace=False)
-      (fc_self): Linear(in_features=256, out_features=64, bias=False)
-      (fc_neigh): Linear(in_features=256, out_features=64, bias=False)
-    )
-  )
-  (user_embedding): Embedding(6041, 256, padding_idx=0)
-  (item_embedding): Embedding(3417, 256, padding_idx=0)
-  (position_embedding): Embedding(200, 64)
-  (s_transformer_modules): ModuleList(
-    (0): TransformerLayer(
-      (multi_head_attention): MultiHeadAttention(
-        (query): Linear(in_features=64, out_features=64, bias=True)
-        (key): Linear(in_features=64, out_features=64, bias=True)
-        (value): Linear(in_features=64, out_features=64, bias=True)
-        (softmax): Softmax(dim=-1)
-        (attn_dropout): Dropout(p=0.5, inplace=False)
-        (dense): Linear(in_features=64, out_features=64, bias=True)
-        (LayerNorm): LayerNorm((64,), eps=1e-12, elementwise_affine=True)
-        (out_dropout): Dropout(p=0.5, inplace=False)
-      )
-      (feed_forward): FeedForward(
-        (dense_1): Linear(in_features=64, out_features=256, bias=True)
-        (dense_2): Linear(in_features=256, out_features=64, bias=True)
-        (LayerNorm): LayerNorm((64,), eps=1e-12, elementwise_affine=True)
-        (dropout): Dropout(p=0.5, inplace=False)
-      )
-    )
-    (1): TransformerLayer(
-      (multi_head_attention): MultiHeadAttention(
-        (query): Linear(in_features=64, out_features=64, bias=True)
-        (key): Linear(in_features=64, out_features=64, bias=True)
-        (value): Linear(in_features=64, out_features=64, bias=True)
-        (softmax): Softmax(dim=-1)
-        (attn_dropout): Dropout(p=0.5, inplace=False)
-        (dense): Linear(in_features=64, out_features=64, bias=True)
-        (LayerNorm): LayerNorm((64,), eps=1e-12, elementwise_affine=True)
-        (out_dropout): Dropout(p=0.5, inplace=False)
-      )
-      (feed_forward): FeedForward(
-        (dense_1): Linear(in_features=64, out_features=256, bias=True)
-        (dense_2): Linear(in_features=256, out_features=64, bias=True)
-        (LayerNorm): LayerNorm((64,), eps=1e-12, elementwise_affine=True)
-        (dropout): Dropout(p=0.5, inplace=False)
-      )
-    )
-  )
-  (d_transformer_modules): ModuleList(
-    (0): TransformerLayer(
-      (multi_head_attention): MultiHeadAttention(
-        (query): Linear(in_features=64, out_features=64, bias=True)
-        (key): Linear(in_features=64, out_features=64, bias=True)
-        (value): Linear(in_features=64, out_features=64, bias=True)
-        (softmax): Softmax(dim=-1)
-        (attn_dropout): Dropout(p=0.5, inplace=False)
-        (dense): Linear(in_features=64, out_features=64, bias=True)
-        (LayerNorm): LayerNorm((64,), eps=1e-12, elementwise_affine=True)
-        (out_dropout): Dropout(p=0.5, inplace=False)
-      )
-      (feed_forward): FeedForward(
-        (dense_1): Linear(in_features=64, out_features=256, bias=True)
-        (dense_2): Linear(in_features=256, out_features=64, bias=True)
-        (LayerNorm): LayerNorm((64,), eps=1e-12, elementwise_affine=True)
-        (dropout): Dropout(p=0.5, inplace=False)
-      )
-    )
-    (1): TransformerLayer(
-      (multi_head_attention): MultiHeadAttention(
-        (query): Linear(in_features=64, out_features=64, bias=True)
-        (key): Linear(in_features=64, out_features=64, bias=True)
-        (value): Linear(in_features=64, out_features=64, bias=True)
-        (softmax): Softmax(dim=-1)
-        (attn_dropout): Dropout(p=0.5, inplace=False)
-        (dense): Linear(in_features=64, out_features=64, bias=True)
-        (LayerNorm): LayerNorm((64,), eps=1e-12, elementwise_affine=True)
-        (out_dropout): Dropout(p=0.5, inplace=False)
-      )
-      (feed_forward): FeedForward(
-        (dense_1): Linear(in_features=64, out_features=256, bias=True)
-        (dense_2): Linear(in_features=256, out_features=64, bias=True)
-        (LayerNorm): LayerNorm((64,), eps=1e-12, elementwise_affine=True)
-        (dropout): Dropout(p=0.5, inplace=False)
-      )
-    )
-  )
-  (LayerNorm): LayerNorm((64,), eps=1e-12, elementwise_affine=True)
-  (dropout): Dropout(p=0.5, inplace=False)
-  (loss_fct): BPRLoss()
-)
-Trainable parameters: 2699776
-wandb: Currently logged in as: unist-dm-lab (use `wandb login --relogin` to force relogin)
-wandb: Tracking run with wandb version 0.12.14
-wandb: Run data is saved locally in /data/notebook/RecBole/wandb/run-20220411_151506-2vc0eou8
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run fast-lion-15
-wandb: ⭐️ View project at https://wandb.ai/unist-dm-lab/recbole-wandb
-wandb: 🚀 View run at https://wandb.ai/unist-dm-lab/recbole-wandb/runs/2vc0eou8
-11 Apr 15:20    INFO  epoch 0 training [time: 318.21s, train loss: 1717.5281]

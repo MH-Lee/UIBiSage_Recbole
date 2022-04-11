@@ -14,7 +14,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from recbole.utils import InputType
 from recbole.model.abstract_recommender import SequentialRecommender
 from recbole.model.loss import BPRLoss
-from recbole.model.layers import TransformerLayer
+from recbole.model.new_layers import TransformerLayer
 from tqdm import tqdm
 
 class UIBiSage(SequentialRecommender):

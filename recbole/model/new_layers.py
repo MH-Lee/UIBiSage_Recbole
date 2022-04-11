@@ -259,11 +259,14 @@ class VanillaAttention(nn.Module):
 class MultiHeadAttention(nn.Module):
     """
     Multi-head Self-attention layers, a attention score dropout layer is introduced.
+
     Args:
         input_tensor (torch.Tensor): the input of the multi-head self-attention layer
         attention_mask (torch.Tensor): the attention mask for input tensor
+
     Returns:
         hidden_states (torch.Tensor): the output of the multi-head self-attention layer
+
     """
 
     def __init__(self, n_heads, hidden_size, hidden_dropout_prob, attn_dropout_prob, layer_norm_eps):
@@ -295,10 +298,10 @@ class MultiHeadAttention(nn.Module):
         x = x.view(*new_x_shape)
         return x
 
-    def forward(self, input_tensor, attention_mask):
-        mixed_query_layer = self.query(input_tensor)
-        mixed_key_layer = self.key(input_tensor)
-        mixed_value_layer = self.value(input_tensor)
+    def forward(self, query_tensor, seq_tensor, attention_mask):
+        mixed_query_layer = self.query(query_tensor)
+        mixed_key_layer = self.key(seq_tensor)
+        mixed_value_layer = self.value(seq_tensor)
 
         query_layer = self.transpose_for_scores(mixed_query_layer).permute(0, 2, 1, 3)
         key_layer = self.transpose_for_scores(mixed_key_layer).permute(0, 2, 3, 1)
@@ -325,7 +328,7 @@ class MultiHeadAttention(nn.Module):
         context_layer = context_layer.view(*new_context_layer_shape)
         hidden_states = self.dense(context_layer)
         hidden_states = self.out_dropout(hidden_states)
-        hidden_states = self.LayerNorm(hidden_states + input_tensor)
+        hidden_states = self.LayerNorm(hidden_states + query_tensor)
 
         return hidden_states
 
@@ -333,10 +336,13 @@ class MultiHeadAttention(nn.Module):
 class FeedForward(nn.Module):
     """
     Point-wise feed-forward layer is implemented by two dense layers.
+
     Args:
         input_tensor (torch.Tensor): the input of the point-wise feed-forward layer
+
     Returns:
         hidden_states (torch.Tensor): the output of the point-wise feed-forward layer
+
     """
 
     def __init__(self, hidden_size, inner_size, hidden_dropout_prob, hidden_act, layer_norm_eps):
@@ -360,8 +366,11 @@ class FeedForward(nn.Module):
 
     def gelu(self, x):
         """Implementation of the gelu activation function.
+
         For information: OpenAI GPT's gelu is slightly different (and gives slightly different results)::
+
             0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
+
         Also see https://arxiv.org/abs/1606.08415
         """
         return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
@@ -383,12 +392,15 @@ class FeedForward(nn.Module):
 class TransformerLayer(nn.Module):
     """
     One transformer layer consists of a multi-head self-attention layer and a point-wise feed-forward layer.
+
     Args:
         hidden_states (torch.Tensor): the input of the multi-head self-attention sublayer
         attention_mask (torch.Tensor): the attention mask for the multi-head self-attention sublayer
+
     Returns:
         feedforward_output (torch.Tensor): The output of the point-wise feed-forward sublayer,
                                            is the output of the transformer layer.
+
     """
 
     def __init__(
@@ -401,14 +413,15 @@ class TransformerLayer(nn.Module):
         )
         self.feed_forward = FeedForward(hidden_size, intermediate_size, hidden_dropout_prob, hidden_act, layer_norm_eps)
 
-    def forward(self, hidden_states, attention_mask):
-        attention_output = self.multi_head_attention(hidden_states, attention_mask)
+    def forward(self, query_tensor, seq_tensor, attention_mask):
+        attention_output = self.multi_head_attention(query_tensor, seq_tensor, attention_mask)
         feedforward_output = self.feed_forward(attention_output)
         return feedforward_output
 
 
 class TransformerEncoder(nn.Module):
     r""" One TransformerEncoder consists of several TransformerLayers.
+
     Args:
         n_layers(num): num of transformer layers in transformer encoder. Default: 2
         n_heads(num): num of attention heads for multi-head attention layer. Default: 2
@@ -419,6 +432,7 @@ class TransformerEncoder(nn.Module):
         hidden_act(str): activation function in feed-forward layer. Default: 'gelu'
                       candidates: 'gelu', 'relu', 'swish', 'tanh', 'sigmoid'
         layer_norm_eps(float): a value added to the denominator for numerical stability. Default: 1e-12
+
     """
 
     def __init__(
@@ -445,9 +459,11 @@ class TransformerEncoder(nn.Module):
             hidden_states (torch.Tensor): the input of the TransformerEncoder
             attention_mask (torch.Tensor): the attention mask for the input hidden_states
             output_all_encoded_layers (Bool): whether output all transformer layers' output
+
         Returns:
             all_encoder_layers (list): if output_all_encoded_layers is True, return a list consists of all transformer
             layers' output, otherwise return a list only consists of the output of last transformer layer.
+
         """
         all_encoder_layers = []
         for layer_module in self.layer:
