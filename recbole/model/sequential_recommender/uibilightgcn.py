@@ -154,7 +154,8 @@ class UIlightGCNSeq(SequentialRecommender):
         trm_output = self.trm_encoder(input_emb, extended_attention_mask, output_all_encoded_layers=True)
         output = trm_output[-1]
         output = self.gather_indexes(output, item_seq_len - 1)
-        if 'cpu' not in self.device:torch.cuda.empty_cache()
+        # import pdb;pdb.set_trace()
+        if 'cpu' not in str(self.device):torch.cuda.empty_cache()
         return user_all_embeddings, item_all_embeddings, output  # [B H]
 
     def calculate_loss(self, interaction):
