@@ -30,7 +30,7 @@ train_neg_sample_args:
   distribution: uniform
   dynamic: none
   strategy: by
-eval_step: 1
+eval_step: 5
 stopping_step: 5
 weight_decay: 0.0
 loss_type: BPR
