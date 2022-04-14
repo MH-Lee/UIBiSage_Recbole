@@ -14,19 +14,19 @@ from sklearn.metrics.pairwise import cosine_similarity
 from recbole.utils import InputType
 from recbole.model.abstract_recommender import SequentialRecommender
 from recbole.model.loss import BPRLoss
-from recbole.model.new_layers import TransformerLayer
+from recbole.model.layers import TransformerEncoder
 from tqdm import tqdm
 
-class UIBiSage(SequentialRecommender):
+class UIBiSage2(SequentialRecommender):
 
     input_type = InputType.PAIRWISE
 
     def __init__(self, config, dataset):
-        super(UIBiSage, self).__init__(config, dataset)
+        super(UIBiSage2, self).__init__(config, dataset)
 
         # load dataset info
-        self.n_users = dataset.user_num
-        self.n_items = dataset.item_num 
+        self.n_users = dataset.user_num + 1
+        self.n_items = dataset.item_num + 1
 
         ## graph config
         self.user_embedding_size = config['user_embedding_size']  # input dim user graph sage
@@ -42,12 +42,12 @@ class UIBiSage(SequentialRecommender):
         else:
             self.ui_matrix = (ui_matrix!=0)
         
-        user_adj = self.adjacency_generation(self.ui_matrix[1:,1:], self.u_cutoff) #0.75)
-        item_adj = self.adjacency_generation(self.ui_matrix[1:,1:].T, self.i_cutoff) #0.75)
-        self.user_graph = self.graph_generation(user_adj, self.n_users, 'user').to(config['device'])
-        self.item_graph = self.graph_generation(item_adj, self.n_items, 'item').to(config['device'])
+        user_adj = self.adjacency_generation(self.ui_matrix, self.u_cutoff) #0.75)
+        item_adj = self.adjacency_generation(self.ui_matrix.T, self.i_cutoff) #0.75)
+        self.user_graph = self.graph_generation(user_adj, 'user')
+        self.item_graph = self.graph_generation(item_adj, 'item')
         # import pdb;pdb.set_trace()
-        self.ui_matrix = self.ui_matrix.to(config['device'])
+
         # transformer paramter
         self.hidden_size = config['hidden_size']
         self.inner_size = config['inner_size']
@@ -60,8 +60,6 @@ class UIBiSage(SequentialRecommender):
         self.initializer_range = config['initializer_range']
         self.loss_type = config['loss_type']
         self.device = config['device']
-        self.gpu_id = config['gpu_id']
-        self.s_attn_first = config['s_attn_first']
 
         # define Graph sage layers
         self.I2U_SAGE = nn.ModuleList([SAGEConv(self.user_embedding_size, self.hidden_size, 'mean')])
@@ -75,35 +73,13 @@ class UIBiSage(SequentialRecommender):
         self.item_embedding = nn.Embedding(self.n_items, self.item_embedding_size, padding_idx=0) # item id [1,2,...]
         self.position_embedding = nn.Embedding(self.max_seq_length, self.hidden_size)
         
-        # Self-Attention layers (Query: Item, Key(Value): Item)
-        self.s_transformer_modules = nn.ModuleList() # to be Q for self-attention       
-        # Attention layers (Query: User, Key(Value): Item)
-        self.d_transformer_modules = nn.ModuleList()
-        
+        self.ui_concat_layer = nn.Linear(self.hidden_size*2, self.hidden_size)
+
         ## transformer layer modul
-        for _ in range(self.n_layers):
-            s_trm_encoder = TransformerLayer(
-                # n_layers=self.n_layers,
-                n_heads=self.n_heads,
-                hidden_size=self.hidden_size,
-                intermediate_size=self.inner_size,
-                hidden_dropout_prob=self.hidden_dropout_prob,
-                attn_dropout_prob=self.attn_dropout_prob,
-                hidden_act=self.hidden_act,
-                layer_norm_eps=self.layer_norm_eps
-            )
-            self.s_transformer_modules.append(deepcopy(s_trm_encoder))
-            d_trm_encoder = TransformerLayer(
-                # n_layers=self.n_layers,
-                n_heads=self.n_heads,
-                hidden_size=self.hidden_size,
-                intermediate_size=self.inner_size,
-                hidden_dropout_prob=self.hidden_dropout_prob,
-                attn_dropout_prob=self.attn_dropout_prob,
-                hidden_act=self.hidden_act,
-                layer_norm_eps=self.layer_norm_eps
-            )
-            self.d_transformer_modules.append(deepcopy(d_trm_encoder))
+        self.trm_encoder = TransformerEncoder(n_layers=self.n_layers, n_heads=self.n_heads, \
+                                              hidden_size=self.hidden_size, inner_size=self.inner_size,\
+                                              hidden_act=self.hidden_act, hidden_dropout_prob=self.hidden_dropout_prob,\
+                                              attn_dropout_prob=self.attn_dropout_prob, layer_norm_eps=self.layer_norm_eps)
 
         self.LayerNorm = nn.LayerNorm(self.hidden_size, eps=self.layer_norm_eps)
         self.dropout = nn.Dropout(self.hidden_dropout_prob)
@@ -133,9 +109,8 @@ class UIBiSage(SequentialRecommender):
     def adjacency_generation(self, ui_matrix, cutoff):
         cosine_sim = cosine_similarity(ui_matrix, Y=None, dense_output=True)
         norm_sim = (cosine_sim + 1) / 2
-
-        norm_sim[norm_sim<cutoff] = 0
-        norm_sim[norm_sim>=cutoff] = 1 
+        
+        norm_sim = (norm_sim > cutoff).astype(int)
         norm_sim = norm_sim-np.diag(np.diag(norm_sim))
         adjacency_list = []
         for i,row in enumerate(norm_sim):
@@ -144,86 +119,49 @@ class UIBiSage(SequentialRecommender):
         adjacency_list = np.array(adjacency_list).T
         return adjacency_list.tolist()
 
-    def graph_generation(self, adjacency_list, ui_num, ui_type):
+    def graph_generation(self, adjacency_list, ui_type):
         if ui_type == 'user':
-            # graph = dgl.graph(adjacency_list[0],adjacency_list[1])
-            graph = dgl.DGLGraph()
-            graph.add_nodes(ui_num+1)
-            graph.add_edges(adjacency_list[0],adjacency_list[1])
-            graph.remove_nodes(0)
-            graph = dgl.add_self_loop(graph)
+            src_ids = torch.tensor(adjacency_list[0])
+            des_ids = torch.tensor(adjacency_list[1])
+            graph = dgl.graph((src_ids, des_ids), idtype=torch.int32, num_nodes=self.n_users, device=self.device)
         elif ui_type == 'item':
-            # graph = dgl.graph(adjacency_list[0],adjacency_list[1])
-            graph = dgl.DGLGraph()
-            graph.add_nodes(ui_num+1)
-            graph.add_edges(adjacency_list[0],adjacency_list[1])
-            graph.remove_nodes(0)
-            graph = dgl.add_self_loop(graph)
+            src_ids = torch.tensor(adjacency_list[0])
+            des_ids = torch.tensor(adjacency_list[1])
+            graph = dgl.graph((src_ids, des_ids), idtype=torch.int32, num_nodes=self.n_items, device=self.device)
         return graph
-    
+
     def seq_interaction_generation(self, dataset):
         ui_matrix = torch.zeros([self.n_users+1, self.n_items+1], dtype=torch.float32)
         for uid in tqdm(dataset[self.USER_ID].unique()):
             user_item = torch.gather(dataset[self.ITEM_ID], 0, torch.where(dataset[self.USER_ID] == uid)[0])
             ui_matrix[uid, user_item] = torch.arange(user_item.size(0), 0 ,-1, dtype=torch.float32)
         return ui_matrix
-    
-    def seq_converto(self, converto, node_embed, ui_matrix):
-        '''
-        This function converts node_embedding by aggregating node_embedding
-        
-        converto: {U2I, I2U}
-        node_embed: updated node embedding 
-        ui_matrix: matrix whose elements show whether user interacts certain item. (dimension: |U|x|V|)
-        '''
-        if self.seq_aggregate:
-            ui_matrix = torch.where((ui_matrix<=self.max_seq_length)&(ui_matrix>0),1.,0.).float()
-        else:
-            ui_matrix = ui_matrix.float()
-        if converto == 'U2I':
-            converto_emb = torch.matmul(ui_matrix.T, node_embed)
-        elif converto == 'I2U':
-            converto_emb = torch.matmul(ui_matrix, node_embed)
-        return converto_emb
-    
+       
     def forward(self, user_seq, item_seq, item_seq_len):
-        # import pdb;pdb.set_trace()
         self.user_graph.ndata['h0'] = self.user_embedding(torch.LongTensor(range(self.user_graph.num_nodes())).to(self.device))
         self.item_graph.ndata['h0'] = self.item_embedding(torch.LongTensor(range(self.item_graph.num_nodes())).to(self.device))
         for w in range(self.graph_num_way):
             # import pdb;pdb.set_trace()
-            # update user and item embedding without converting
-            user_temp = F.leaky_relu(self.U2I_SAGE[w](self.user_graph, self.user_graph.ndata['h'+str(w)]))
-            item_temp = F.leaky_relu(self.I2U_SAGE[w](self.item_graph, self.item_graph.ndata['h'+str(w)]))
-            # convert user embedding into item embedding, vice versa
-            self.user_graph.ndata['h'+str(w+1)] = self.seq_converto('I2U', item_temp, self.ui_matrix[1:,1:])
-            self.item_graph.ndata['h'+str(w+1)] = self.seq_converto('U2I', user_temp, self.ui_matrix[1:,1:])
+            self.user_graph.ndata['h'+str(w+1)] = F.leaky_relu(self.U2I_SAGE[w](self.user_graph, self.user_graph.ndata['h'+str(w)]))
+            self.item_graph.ndata['h'+str(w+1)] = F.leaky_relu(self.I2U_SAGE[w](self.item_graph, self.item_graph.ndata['h'+str(w)]))
         
+        user_emb = self.user_graph.ndata['h'+str(self.graph_num_way)][(user_seq).unsqueeze(1).repeat((1, self.max_seq_length))]
         item_emb = self.item_graph.ndata['h'+str(self.graph_num_way)][item_seq] # (B,T,H)  
         position_ids = torch.arange(item_seq.size(1), dtype=torch.long, device=item_seq.device)
         position_ids = position_ids.unsqueeze(0).expand_as(item_seq)
         position_embedding = self.position_embedding(position_ids)
-
-        input_emb = item_emb + position_embedding
+        
+        input_emb = torch.cat([user_emb, item_emb], dim=2)
+        input_emb = self.ui_concat_layer(input_emb)
+        # import pdb;pdb.set_trace()
+        input_emb = input_emb + position_embedding
         input_emb = self.LayerNorm(input_emb)
         input_emb = self.dropout(input_emb)
 
         extended_attention_mask = self.get_attention_mask(item_seq)
-        for i in range(self.n_layers):
-            if self.s_attn_first == True:
-                ### s-attention (Sequential-attention)
-                input_emb = self.s_transformer_modules[i](query_tensor=input_emb, seq_tensor=input_emb, \
-                                                          attention_mask=extended_attention_mask)
-                query = self.user_graph.ndata['h'+str(self.graph_num_way)][(user_seq - 1).unsqueeze(1).repeat((1,self.max_seq_length))]
-                trm_output = self.d_transformer_modules[i](query_tensor=query, seq_tensor=input_emb, attention_mask=extended_attention_mask)
-            else:
-                query = self.user_graph.ndata['h'+str(self.graph_num_way)][(user_seq - 1).unsqueeze(1).repeat((1,self.max_seq_length))]
-                input_emb = self.d_transformer_modules[i](query_tensor=query, seq_tensor=input_emb, attention_mask=extended_attention_mask)
-                ### s-attention (Sequential-attention)
-                trm_output = self.s_transformer_modules[i](query_tensor=None, seq_tensor=input_emb, attn_mask=extended_attention_mask)
-
-        # output = trm_output[-1]
-        output = self.gather_indexes(trm_output, item_seq_len - 1)
+        trm_output = self.trm_encoder(input_emb, extended_attention_mask, output_all_encoded_layers=True)
+        output = trm_output[-1]
+        output = self.gather_indexes(output, item_seq_len - 1)
         return output  # [B H]
 
     def calculate_loss(self, interaction):
