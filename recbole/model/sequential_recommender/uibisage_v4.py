@@ -1,3 +1,4 @@
+from ast import Raise
 from cgi import test
 from copy import deepcopy
 from re import I
@@ -10,6 +11,7 @@ import dgl
 from dgl.nn.pytorch import SAGEConv
 
 import numpy as np
+import scipy.sparse as  sp
 from sklearn.metrics.pairwise import cosine_similarity
 from recbole.utils import InputType
 from recbole.model.abstract_recommender import SequentialRecommender
@@ -17,16 +19,16 @@ from recbole.model.loss import BPRLoss
 from recbole.model.layers import TransformerEncoder
 from tqdm import tqdm
 
-class UIBiSage2(SequentialRecommender):
+class UIBiSage4(SequentialRecommender):
 
     input_type = InputType.PAIRWISE
 
     def __init__(self, config, dataset):
-        super(UIBiSage2, self).__init__(config, dataset)
+        super(UIBiSage4, self).__init__(config, dataset)
 
         # load dataset info
-        self.n_users = dataset.user_num + 1
-        self.n_items = dataset.item_num + 1
+        self.n_users = dataset.user_num
+        self.n_items = dataset.item_num
 
         ## graph config
         self.user_embedding_size = config['user_embedding_size']  # input dim user graph sage
@@ -35,19 +37,7 @@ class UIBiSage2(SequentialRecommender):
         self.u_cutoff = config['u_cutoff'] ## user  cosine sim cut off
         self.i_cutoff = config['i_cutoff'] ## item cosine sim cut off
         self.graph_num_way = config['n_way']
-        
-        ui_matrix = self.seq_interaction_generation(dataset)
-        if self.seq_aggregate:
-            self.ui_matrix = ui_matrix
-        else:
-            self.ui_matrix = (ui_matrix!=0)
-        
-        user_adj = self.adjacency_generation(self.ui_matrix, self.u_cutoff) #0.75)
-        item_adj = self.adjacency_generation(self.ui_matrix.T, self.i_cutoff) #0.75)
-        self.user_graph = self.graph_generation(user_adj, 'user')
-        self.item_graph = self.graph_generation(item_adj, 'item')
-        # import pdb;pdb.set_trace()
-
+              
         # transformer paramter
         self.hidden_size = config['hidden_size']
         self.inner_size = config['inner_size']
@@ -61,18 +51,19 @@ class UIBiSage2(SequentialRecommender):
         self.loss_type = config['loss_type']
         self.device = config['device']
 
-        # define Graph sage layers
-        self.I2U_SAGE = nn.ModuleList([SAGEConv(self.user_embedding_size, self.hidden_size, 'mean')])
-        self.I2U_SAGE.extend([SAGEConv(self.hidden_size, self.hidden_size, 'mean') for i in range(self.graph_num_way - 1)])
-        # SAGE layer for converting user2item vector
-        self.U2I_SAGE = nn.ModuleList([SAGEConv(self.user_embedding_size, self.hidden_size, 'mean')])
-        self.U2I_SAGE.extend([SAGEConv(self.hidden_size, self.hidden_size, 'mean') for i in range(self.graph_num_way - 1)])
+        ## Bipartite Graph Sage
+        self.BP_SAGE = nn.ModuleList([SAGEConv((self.user_embedding_size, self.item_embedding_size), self.hidden_size, 'mean')])
+        self.BP_SAGE.extend([SAGEConv(self.hidden_size, self.hidden_size, 'mean') for i in range(self.graph_num_way - 1)])
         
         # define layers and loss
-        self.user_embedding = nn.Embedding(self.n_users, self.user_embedding_size, padding_idx=0) # user id [1,2,...]
-        self.item_embedding = nn.Embedding(self.n_items, self.item_embedding_size, padding_idx=0) # item id [1,2,...]
+        self.user_embedding = nn.Embedding(self.n_users, self.user_embedding_size, padding_idx=0, device=self.device) # user id [1,2,...]
+        self.item_embedding = nn.Embedding(self.n_items, self.item_embedding_size, padding_idx=0, device=self.device) # item id [1,2,...]
         self.position_embedding = nn.Embedding(self.max_seq_length, self.hidden_size)
         
+        ui_matrix = dataset.inter_matrix(form='coo').astype(np.float32)
+        # import pdb;pdb.set_trace()
+        self.uibi_graph = self.graph_generation(ui_matrix, 'bipartite').to(self.device)
+        # import pdb;pdb.set_trace()
         self.ui_concat_layer = nn.Linear(self.hidden_size*2, self.hidden_size)
 
         ## transformer layer modul
@@ -128,6 +119,14 @@ class UIBiSage2(SequentialRecommender):
             src_ids = torch.tensor(adjacency_list[0])
             des_ids = torch.tensor(adjacency_list[1])
             graph = dgl.graph((src_ids, des_ids), idtype=torch.int32, num_nodes=self.n_items, device=self.device)
+        elif ui_type == 'bipartite':
+            if isinstance(adjacency_list, sp.spmatrix):
+                inter_matrix = adjacency_list
+            else:
+                inter_matrix = sp.coo_matrix(adjacency_list)
+            graph = dgl.bipartite_from_scipy(inter_matrix, utype='user', etype='interaction', vtype='item', device=self.device)
+        else:
+            raise NotImplementedError('[ERROR] NotImplementedError : Graph generation function of {} is not impletmented : {}'.format(ui_type))
         return graph
 
     def seq_interaction_generation(self, dataset):
@@ -138,21 +137,28 @@ class UIBiSage2(SequentialRecommender):
         return ui_matrix
        
     def forward(self, user_seq, item_seq, item_seq_len):
-        self.user_graph.ndata['h0'] = self.user_embedding(torch.LongTensor(range(self.user_graph.num_nodes())).to(self.device))
-        self.item_graph.ndata['h0'] = self.item_embedding(torch.LongTensor(range(self.item_graph.num_nodes())).to(self.device))
+        self.uibi_graph.srcdata['h0'] = self.user_embedding(torch.LongTensor(range(self.n_users)).to(self.device))
+        self.uibi_graph.dstdata['h0'] = self.item_embedding(torch.LongTensor(range(self.n_items)).to(self.device))
         for w in range(self.graph_num_way):
             # import pdb;pdb.set_trace()
-            self.user_graph.ndata['h'+str(w+1)] = F.leaky_relu(self.U2I_SAGE[w](self.user_graph, self.user_graph.ndata['h'+str(w)]))
-            self.item_graph.ndata['h'+str(w+1)] = F.leaky_relu(self.I2U_SAGE[w](self.item_graph, self.item_graph.ndata['h'+str(w)]))
+            self.uibi_graph.dstdata['h'+str(w+1)] = F.leaky_relu(self.BP_SAGE[w](self.uibi_graph, 
+                                                                                 (self.uibi_graph.ndata['h'+str(w)]['user'], 
+                                                                                  self.uibi_graph.ndata['h'+str(w)]['item'])))
+            self.uibi_graph.srcdata['h'+str(w+1)] = F.leaky_relu(self.BP_SAGE[w](self.uibi_graph.reverse(), 
+                                                                                 (self.uibi_graph.ndata['h'+str(w)]['item'],
+                                                                                  self.uibi_graph.ndata['h'+str(w)]['user'])))
+ 
+       
+        user_emb = self.uibi_graph.ndata['h'+str(self.graph_num_way)]['user'][user_seq.unsqueeze(1).repeat((1, self.max_seq_length))]
+        item_emb = self.uibi_graph.ndata['h'+str(self.graph_num_way)]['item'][item_seq]
         
-        user_emb = self.user_graph.ndata['h'+str(self.graph_num_way)][user_seq.unsqueeze(1).repeat((1, self.max_seq_length))]
-        item_emb = self.item_graph.ndata['h'+str(self.graph_num_way)][item_seq] # (B,T,H)  
         position_ids = torch.arange(item_seq.size(1), dtype=torch.long, device=item_seq.device)
         position_ids = position_ids.unsqueeze(0).expand_as(item_seq)
         position_embedding = self.position_embedding(position_ids)
         
         input_emb = torch.cat([user_emb, item_emb], dim=2)
         input_emb = self.ui_concat_layer(input_emb)
+        input_emb = F.relu(input_emb)
         # import pdb;pdb.set_trace()
         input_emb = input_emb + position_embedding
         input_emb = self.LayerNorm(input_emb)
@@ -173,14 +179,14 @@ class UIBiSage2(SequentialRecommender):
         # import pdb;pdb.set_trace()
         if self.loss_type == 'BPR':
             neg_items= interaction[self.NEG_ITEM_ID]
-            pos_items_emb = self.item_graph.ndata['h'+str(self.graph_num_way)][pos_items]
-            neg_items_emb = self.item_graph.ndata['h'+str(self.graph_num_way)][neg_items]
+            pos_items_emb = self.uibi_graph.ndata['h'+str(self.graph_num_way)]['item'][pos_items]
+            neg_items_emb = self.uibi_graph.ndata['h'+str(self.graph_num_way)]['item'][neg_items]
             pos_score = torch.sum(seq_output * pos_items_emb, dim=-1) # [batch_size]
             neg_score = torch.sum(seq_output * neg_items_emb, dim=-1) # [batch_size]
             loss = self.loss_fct(pos_score, neg_score)
             return loss
         else:
-            test_item_emb = self.item_graph.ndata['h'+str(self.graph_num_way)]
+            test_item_emb = self.uibi_graph.ndata['h'+str(self.graph_num_way)]['item']
             logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1))
             loss = self.loss(logits, pos_items)
             return loss
@@ -191,7 +197,7 @@ class UIBiSage2(SequentialRecommender):
         item_seq_len = interaction[self.ITEM_SEQ_LEN]
         test_item = interaction[self.ITEM_ID]
         seq_output = self.forward(user_seq, item_seq, item_seq_len)
-        test_item_emb = self.item_graph.ndata['h'+str(self.graph_num_way)][test_item]
+        test_item_emb = self.uibi_graph.ndata['h'+str(self.graph_num_way)]['item'][test_item]
         scores = torch.mul(seq_output, test_item_emb).sum(dim=1)  # [B]
         return scores
 
@@ -200,6 +206,6 @@ class UIBiSage2(SequentialRecommender):
         item_seq = interaction[self.ITEM_SEQ]
         item_seq_len = interaction[self.ITEM_SEQ_LEN]
         seq_output = self.forward(user_seq, item_seq, item_seq_len)
-        test_items_emb = self.item_graph.ndata['h'+str(self.graph_num_way)]
+        test_items_emb = self.uibi_graph.ndata['h'+str(self.graph_num_way)]['item']
         scores = torch.matmul(seq_output, test_items_emb.transpose(0, 1)) # [batch_size, n_items]
         return scores

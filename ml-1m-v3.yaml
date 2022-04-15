@@ -3,7 +3,7 @@ gpu_id: 1
 checkpoint_dir: './saved/ml-1m/'
 data_path: ./dataset/
 save_dataset: true
-show_progress: false
+show_progress: true
 use_gpu: true
 log_wandb : true
 wandb_project : 'recbole-wandb'
@@ -62,11 +62,11 @@ eval_neg_sample_args:
 
 n_layers: 2
 n_heads: 2
-n_way : 2
+n_way : 1
 n_blocks : 2
 
-user_embedding_size : 256
-item_embedding_size : 256
+user_embedding_size : 128
+item_embedding_size : 128
 
 hidden_size : 64
 inner_size: 256
@@ -79,6 +79,6 @@ initializer_range: 0.02
 loss_type: 'BPR'
 
 seq_aggregate : false
-u_cutoff : 0.6
-i_cutoff : 0.6
+u_cutoff : 0.7
+i_cutoff : 0.7
 s_attn_first : true

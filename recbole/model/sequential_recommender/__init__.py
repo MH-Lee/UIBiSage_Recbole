@@ -3,3 +3,5 @@ from recbole.model.sequential_recommender.sasrec import SASRec
 from recbole.model.sequential_recommender.uibisage import UIBiSage
 from recbole.model.sequential_recommender.uibilightgcn import UIlightGCNSeq
 from recbole.model.sequential_recommender.uibisage_v2 import UIBiSage2
+from recbole.model.sequential_recommender.uibisage_v3 import UIBiSage3
+from recbole.model.sequential_recommender.uibisage_v4 import UIBiSage4

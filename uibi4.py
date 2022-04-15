@@ -5,14 +5,14 @@ from logging import getLogger
 import json
 from recbole.config import Config
 from recbole.data import create_dataset, data_preparation, save_split_dataloaders, load_split_dataloaders
-from recbole.model.sequential_recommender import UIBiSage2
+from recbole.model.sequential_recommender import UIBiSage3
 from recbole.trainer import Trainer
 from recbole.utils import init_seed, init_logger, InputType, set_color
 import argparse
 
 def run_recbole(model_name, data_name):
-    config = Config(model=UIBiSage2, dataset=data_name, 
-                    config_file_list=['{dataname}.yaml'.format(dataname=data_name)])
+    config = Config(model=UIBiSage3, dataset=data_name, 
+                    config_file_list=['{dataname}-v3.yaml'.format(dataname=data_name)])
     init_seed(config['seed'], config['reproducibility'])
     init_logger(config)
     logger = getLogger()
