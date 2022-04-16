@@ -1,7 +1,7 @@
 # environment settings
 gpu_id: 1
 checkpoint_dir: './saved/ml-1m/'
-data_path: ./dataset/
+data_path: ./dataset_benchmark/
 save_dataset: true
 show_progress: false
 use_gpu: true
