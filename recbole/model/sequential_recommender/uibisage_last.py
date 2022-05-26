@@ -17,12 +17,12 @@ from recbole.model.loss import BPRLoss
 from recbole.model.layers import TransformerEncoder
 from tqdm import tqdm
 
-class UIBiSage2(SequentialRecommender):
+class UIBiSage(SequentialRecommender):
 
     input_type = InputType.PAIRWISE
 
     def __init__(self, config, dataset):
-        super(UIBiSage2, self).__init__(config, dataset)
+        super(UIBiSage, self).__init__(config, dataset)
 
         # load dataset info
         self.n_users = dataset.user_num + 1
@@ -46,8 +46,7 @@ class UIBiSage2(SequentialRecommender):
         item_adj = self.adjacency_generation(self.ui_matrix.T, self.i_cutoff) #0.75)
         self.user_graph = self.graph_generation(user_adj, 'user')
         self.item_graph = self.graph_generation(item_adj, 'item')
-        # import pdb;pdb.set_trace()
-
+        # import pdb;pdb.set_trace()       
         # transformer paramter
         self.hidden_size = config['hidden_size']
         self.inner_size = config['inner_size']
@@ -55,11 +54,13 @@ class UIBiSage2(SequentialRecommender):
         self.n_heads = config['n_heads']
         self.hidden_dropout_prob = config['hidden_dropout_prob']
         self.attn_dropout_prob = config['attn_dropout_prob']
+        self.graph_act = self.get_hidden_act(config['graph_act'])
         self.hidden_act = config['hidden_act']
         self.layer_norm_eps = config['layer_norm_eps']
         self.initializer_range = config['initializer_range']
         self.loss_type = config['loss_type']
         self.device = config['device']
+        self.graph_norm = nn.BatchNorm1d(self.hidden_size)
 
         # define Graph sage layers
         self.I2U_SAGE = nn.ModuleList([SAGEConv(self.user_embedding_size, self.hidden_size, 'mean')])
@@ -73,8 +74,12 @@ class UIBiSage2(SequentialRecommender):
         self.item_embedding = nn.Embedding(self.n_items, self.item_embedding_size, padding_idx=0) # item id [1,2,...]
         self.position_embedding = nn.Embedding(self.max_seq_length, self.hidden_size)
         
-        self.ui_concat_layer = nn.Linear(self.hidden_size*2, self.hidden_size)
-
+        # mix user item node embeddings
+        self.mix_u_fc = nn.ModuleList()
+        self.mix_u_fc.extend([nn.Linear(self.hidden_sizem*2, self.hidden_size) for i in range(self.graph_num_way)])
+        self.mix_i_fc = nn.ModuleList()
+        self.mix_i_fc.extend([nn.Linear(self.hidden_size*2, self.hidden_size) for i in range(self.graph_num_way)])
+        
         ## transformer layer modul
         self.trm_encoder = TransformerEncoder(n_layers=self.n_layers, n_heads=self.n_heads, \
                                               hidden_size=self.hidden_size, inner_size=self.inner_size,\
@@ -119,6 +124,15 @@ class UIBiSage2(SequentialRecommender):
         adjacency_list = np.array(adjacency_list).T
         return adjacency_list.tolist()
 
+    def get_hidden_act(self, act):
+        ACT2FN = {
+            "relu": F.relu,
+            "tanh": torch.tanh,
+            "sigmoid": torch.sigmoid,
+            "leaky_relu": F.leaky_relu 
+        }
+        return ACT2FN[act]
+
     def graph_generation(self, adjacency_list, ui_type):
         if ui_type == 'user':
             src_ids = torch.tensor(adjacency_list[0])
@@ -136,30 +150,47 @@ class UIBiSage2(SequentialRecommender):
             user_item = torch.gather(dataset[self.ITEM_ID], 0, torch.where(dataset[self.USER_ID] == uid)[0])
             ui_matrix[uid, user_item] = torch.arange(user_item.size(0), 0 ,-1, dtype=torch.float32)
         return ui_matrix
-       
+    
+    def seq_converto(self, converto, node_embed, ui_matrix):
+        '''
+        This function converts node_embedding by aggregating node_embedding
+        
+        converto: {U2I, I2U}
+        node_embed: updated node embedding 
+        ui_matrix: matrix whose elements show whether user interacts certain item. (dimension: |U|x|V|)
+        '''
+        if converto == 'U2I':
+            converto_emb = torch.matmul(ui_matrix.T, node_embed)/(((ui_matrix.T).sum(axis=1).view(-1,1))+1e-6)
+        elif converto == 'I2U':
+            converto_emb = torch.matmul(ui_matrix, node_embed)/(((ui_matrix).sum(axis=1).view(-1,1))+1e-6) 
+        return converto_emb
+    
     def forward(self, user_seq, item_seq, item_seq_len):
         self.user_graph.ndata['h0'] = self.user_embedding(torch.LongTensor(range(self.user_graph.num_nodes())).to(self.device))
         self.item_graph.ndata['h0'] = self.item_embedding(torch.LongTensor(range(self.item_graph.num_nodes())).to(self.device))
         for w in range(self.graph_num_way):
-            # import pdb;pdb.set_trace()
-            self.user_graph.ndata['h'+str(w+1)] = F.leaky_relu(self.U2I_SAGE[w](self.user_graph, self.user_graph.ndata['h'+str(w)]))
-            self.item_graph.ndata['h'+str(w+1)] = F.leaky_relu(self.I2U_SAGE[w](self.item_graph, self.item_graph.ndata['h'+str(w)]))
-        
+            ### update user and item embedding without converting
+            ### modify activation function 
+            user_temp = self.graph_act(self.U2I_SAGE[w](self.user_graph, self.user_graph.ndata['h'+str(w)]))
+            item_temp = self.graph_act(self.I2U_SAGE[w](self.item_graph, self.item_graph.ndata['h'+str(w)]))
+            concat_I2U = torch.cat([self.seq_converto('I2U', item_temp, self.ui_matrix[1:,1:]),user_temp], dim = 1)
+            concat_U2I = torch.cat([self.seq_converto('U2I', user_temp, self.ui_matrix[1:,1:]),item_temp], dim = 1)
+            self.user_graph.ndata['h'+str(w+1)] = self.graph_act(self.mix_u_fc[w](concat_I2U)) #(U,H)
+            self.item_graph.ndata['h'+str(w+1)] = self.graph_act(self.mix_i_fc[w](concat_U2I))
+            
         user_emb = self.user_graph.ndata['h'+str(self.graph_num_way)][user_seq.unsqueeze(1).repeat((1, self.max_seq_length))]
         item_emb = self.item_graph.ndata['h'+str(self.graph_num_way)][item_seq] # (B,T,H)  
         position_ids = torch.arange(item_seq.size(1), dtype=torch.long, device=item_seq.device)
         position_ids = position_ids.unsqueeze(0).expand_as(item_seq)
         position_embedding = self.position_embedding(position_ids)
         
-        input_emb = torch.cat([user_emb, item_emb], dim=2)
-        input_emb = self.ui_concat_layer(input_emb)
         # import pdb;pdb.set_trace()
-        input_emb = input_emb + position_embedding
-        input_emb = self.LayerNorm(input_emb)
-        input_emb = self.dropout(input_emb)
+        item_emb = item_emb + position_embedding
+        item_emb = self.LayerNorm(item_emb)
+        item_emb = self.dropout(item_emb)
 
         extended_attention_mask = self.get_attention_mask(item_seq)
-        trm_output = self.trm_encoder(input_emb, extended_attention_mask, output_all_encoded_layers=True)
+        trm_output = self.trm_encoder(item_emb, extended_attention_mask, output_all_encoded_layers=True)
         output = trm_output[-1]
         output = self.gather_indexes(output, item_seq_len - 1)
         return output  # [B H]

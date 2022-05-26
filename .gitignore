@@ -15,3 +15,4 @@ wandb/*
 log/*
 *.out
 dataset_benchmark/
+backup_model/
