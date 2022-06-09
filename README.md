@@ -1,4 +1,6 @@
-# UIBiGNN recommendation 
+# UIBiGNN  sequential recommendation 
+
+Graph representation recommendation system Recbole package version
 
 # Environment
 
